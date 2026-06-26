@@ -1,17 +1,19 @@
-﻿from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify
 import joblib
 import pandas as pd
 
 app = Flask(__name__)
 
 model = joblib.load("models/fraud_model.pkl")
+amount_scaler = joblib.load("models/amount_scaler.pkl")
+time_scaler = joblib.load("models/time_scaler.pkl")
 
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "message": "Fraud Detection API is running!",
         "endpoints": {
-            "/predict": "POST - Send transaction data to get fraud prediction"
+            "/predict": "POST - Send raw transaction data (Amount, Time, V1-V28) to get fraud prediction"
         }
     })
 
@@ -20,6 +22,12 @@ def predict():
     try:
         data = request.get_json()
         df = pd.DataFrame([data])
+
+        # Apply the same scaling used during training
+        df["Amount_scaled"] = amount_scaler.transform(df[["Amount"]])
+        df["Time_scaled"] = time_scaler.transform(df[["Time"]])
+        df = df.drop(columns=["Amount", "Time"])
+
         prediction = model.predict(df)[0]
         probability = model.predict_proba(df)[0][1]
 
